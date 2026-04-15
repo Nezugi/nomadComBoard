@@ -16,6 +16,7 @@ Part of the **Off‑Grid Community Suite**.
 - **Tags** — assign on creation; tag cloud and filtered views
 - **User accounts** — registration, login, profiles (LXMF address, bio, city, website)
 - **Roles** — Guest · User · Moderator · Admin with granular permissions
+- **Groups** — Admin can create Groups an restrict Subforums in read / write to ceratain groups
 - **Moderation** — close/reopen topics, delete topics and comments
 - **Admin panel** — manage subforums, rules, moderators, passwords and users
 - **Clickable LXMF addresses** — contact users directly from profiles
