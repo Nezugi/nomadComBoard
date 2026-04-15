@@ -2,7 +2,7 @@
 
 A full‑featured community discussion forum for [NomadNet](https://github.com/markqvist/NomadNet) nodes.
 
-Part of the **Off‑Grid Community Suite**.
+Part of the [**Off‑Grid Community Suite**](https://github.com/Nezugi/Off-Grid-Community-Suite).
 
 **Tech stack:** Python · Micron Markup · SQLite  
 **No external dependencies. No internet required.**
