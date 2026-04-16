@@ -13,7 +13,7 @@ import time
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 
 storage_path  = "/home/user/.nomadComBoard"         # Path for DB & data
-page_path     = ":/page/ComBoard"                   # Path on node (: = local node)
+page_path     = ":/page/comboard"                   # Path on node (: = local node)
 forum_name    = "nomadComBoard"                     # Display name
 site_description = "Discussions, topics & comments"  # Short description
 node_homepage = ":/page/index.mu"                # Link to node homepage
