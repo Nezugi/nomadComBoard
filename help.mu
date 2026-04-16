@@ -1,44 +1,53 @@
 #!/usr/bin/env python3
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import main as forum
-import session as sess
 
-user  = sess.get_current_user()
-token = sess.session_token()
+# nomadBlog - Help / info page
 
-print("#!c=0")
-print(forum.nav_bar(user, token=token))
-forum.print_header("Help")
-print()
+import main
 
-print(">Getting Started")
-print()
-print("nomadForum is a discussion forum on this NomadNet node.")
-print("Register an account to create topics and post replies.")
-print("Guests can read all posts without registering.")
-print()
-print("-")
-print(">Subforums & Topics")
-print()
-print("The start page lists all subforums.")
-print("Click a subforum to see its topics, newest activity first.")
-print("Open a topic to read it and post a reply.")
-print("Topics can be tagged — click a tag to find related topics.")
-print()
-print("-")
-print(">Your Profile")
-print()
-print("Your profile shows your posts, join date and contact info.")
-print("Add your LXMF address so others can reach you directly.")
-print("Change your password and profile info under Settings.")
-print()
-print("-")
-print(">Roles")
-print()
-print("`!Guest`!     read only")
-print("`!User`!      post topics and replies, edit your profile")
-print("`F5d5`!Mod`!`f       close/reopen topics, delete posts")
-print("`F4af`!Admin`!`f     manage subforums, users and rules")
-print()
-forum.print_footer()
+try:
+    print(main.PAGE_HEADER, end="")
+    main.print_header("Help")
+    print()
+
+    print(">About this Blog")
+    print()
+    print("This is the node blog — posts, news and notes from the operator.")
+    print("Browse posts, filter by tag, or read full articles.")
+    print()
+    print("-")
+    print(">Reading Posts")
+    print()
+    print("The start page lists all posts, newest first.")
+    print("Click a post title to read the full article.")
+    print("Use the Tags page to find posts by topic.")
+    print()
+    print("-")
+    print(">Tags")
+    print()
+    print("Each post can have one or more tags.")
+    print("Click a tag to see all posts with that tag.")
+    print("Browse all tags on the Tags page.")
+    print()
+    print("-")
+    print(">Writing Posts")
+    print()
+    print("Only the node admin can write and publish posts.")
+    print("Log in via Admin Login to access the write form.")
+    print("Posts support line breaks and tags.")
+    print()
+    print("-")
+    print(">Markup")
+    print()
+    print("Posts are plain text with optional Micron formatting.")
+    print("Use standard text or Micron codes for styling.")
+    print()
+
+    main.print_footer()
+except Exception as e:
+    print(f"`Ff55Error: {e}`f")
+    import traceback
+    traceback.print_exc()
+    try:
+        main.print_footer()
+    except:
+        pass
