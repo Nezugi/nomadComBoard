@@ -28,10 +28,10 @@ Part of the [**Off‑Grid Community Suite**](https://github.com/Nezugi/Off-Grid-
 ## Installation
 
 ```bash
-cp -r comboard/ ~/.nomadnetwork/storage/pages/comboard/
+copy the files to  ~/.nomadnetwork/storage/pages/comboard/
+
 chmod +x ~/.nomadnetwork/storage/pages/comboard/*.mu
 chmod +x ~/.nomadnetwork/storage/pages/comboard/admin/*.mu
-mkdir -p /home/YOUR_USER/.nomadComBoard
 
 # Edit main.py and set storage_path
 python3 ~/.nomadnetwork/storage/pages/comboard/admin/create_admin.py
