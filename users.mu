@@ -13,7 +13,7 @@ token = sess.session_token()
 back_f = f"session={token}" if token else ""
 back   = f"{forum.page_path}/index.mu`{back_f}" if back_f else f"{forum.page_path}/index.mu"
 print(forum.nav_bar(user, back_url=back, token=token))
-print(">Nutzer")
+print(">Users")
 print()
 
 for u in forum.get_all_users():
@@ -28,8 +28,8 @@ for u in forum.get_all_users():
     if token:
         p_f += f"|session={token}"
     if role:
-        print(f"`[{dn}`{forum.page_path}/profile.mu`{p_f}]  {role}  `F777{u['post_count']} Beiträge`f")
+        print(f"`[{dn}`{forum.page_path}/profile.mu`{p_f}]  {role}  `F777{u['post_count']} posts`f")
     else:
-        print(f"`[{dn}`{forum.page_path}/profile.mu`{p_f}]  `F777{u['post_count']} Beiträge`f")
+        print(f"`[{dn}`{forum.page_path}/profile.mu`{p_f}]  `F777{u['post_count']} posts`f")
 
 forum.print_footer()

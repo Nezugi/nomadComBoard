@@ -47,7 +47,8 @@ print(f"Posts: {target['post_count']}")
 print()
 
 if target.get("lxmf_address") and len(target["lxmf_address"]) == 32:
-    print(f"LXMF: `F4be{target['lxmf_address']}`f")
+    lx = target["lxmf_address"]
+    print(f"LXMF: {forum.lxmf_link(lx)}")
 
 if target.get("city"):
     print(f"City: {target['city']}")

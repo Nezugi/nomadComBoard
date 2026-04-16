@@ -834,8 +834,9 @@ def profile_link(username, token=None):
 def nav_bar(current_user=None, back_url=None, token=None):
     """Return standard navigation bar as Micron string."""
     lines = []
-    lines.append(f"`c`!`F0af{forum_name}`!`f`c")
-    lines.append(f"`c`F777{site_description}`f`c")
+    lines.append(f"`c`!`F0af{forum_name}`!`f")
+    lines.append(f"`c`F777{site_description}`f")
+    lines.append("`a")
     lines.append("-")
 
     def lnk(label, dest, extra=""):
@@ -873,13 +874,14 @@ def nav_bar(current_user=None, back_url=None, token=None):
 def print_footer():
     """Footer with suite info."""
     print("-")
-    print("`c`F444Off-Grid Community Suite · NomadNet`f`c")
+    print("`c`F444Off-Grid Community Suite · NomadNet`f")
+    print("`a")
 
 
 def lxmf_link(address):
-    """Clickable LXMF address."""
+    """Clickable LXMF address in NomadNet single-segment format."""
     if address and len(address) == 32 and all(c in "0123456789abcdefABCDEF" for c in address):
-        return f"`[{address}`lxmf://{address}]"
+        return f"`F4be`[lxmf@{address}]`f"
     return ""
 
 
