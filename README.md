@@ -110,10 +110,10 @@ comboard/
 
 ## Similar Projects
 
-- [nomadForum](https://codeberg.org/AutumnSpark1226/nomadForum) — separate implementation
+- [nomadForum](https://github.com/AutumnSpark1226/nomadForum) — separate implementation
 
-nomadComBoard is independently developed with a tag system, moderator role model and clickable LXMF addresses.
-
+nomadComBoard is independently developed with a tag system, moderator role model and Profil Page
+I like the NomadForum but wanted to do my owne interpretation for the nomadnet
 ---
 
 ## Access
