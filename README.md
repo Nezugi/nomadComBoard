@@ -126,8 +126,8 @@ comboard/
 
 - [nomadForum](https://github.com/AutumnSpark1226/nomadForum) — separate implementation
 
-nomadComBoard is independently developed with a tag system, moderator role model and Profil Page
-I like the NomadForum but wanted to do my owne interpretation for the nomadnet
+# nomadComBoard is independently developed with a tag system, moderator role model and Profil Page
+# I like the NomadForum but wanted to do my own interpretation for the nomadnet
 ---
 
 ## Access
