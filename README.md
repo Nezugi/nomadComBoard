@@ -28,15 +28,29 @@ Part of the [**Off‑Grid Community Suite**](https://github.com/Nezugi/Off-Grid-
 ## Installation
 
 ```bash
-copy the files to  ~/.nomadnetwork/storage/pages/comboard/
+# Installation of nomadComBoard
 
+## 1. Clone the repository
+git clone https://github.com/Nezugi/nomadComBoard
+cd nomadComBoard
+
+## 2. Copy comboard page into your NomadNet pages directory
+cp -r comboard/ ~/.nomadnetwork/storage/pages/comboard/
+
+## 3. Make all .mu files executable
 chmod +x ~/.nomadnetwork/storage/pages/comboard/*.mu
 chmod +x ~/.nomadnetwork/storage/pages/comboard/admin/*.mu
 
-# Edit main.py and set storage_path
+## 4. Edit main.py
+nano ~/.nomadnetwork/storage/pages/comboard/main.py
+# storage_path = "/home/YOUR_USER/.nomadComBoard"
+
+## 5. Create the admin account
 python3 ~/.nomadnetwork/storage/pages/comboard/admin/create_admin.py
 
-# Restart NomadNet
+# After installation, access the forum via:
+# YOUR_NODE_HASH:/page/comboard/index.mu
+
 ```
 
 ---
