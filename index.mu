@@ -20,19 +20,22 @@ print()
 if not subforums:
     print("No subforums yet.")
 else:
+    first = True
     for sf in subforums:
         if not forum.user_can_read_subforum(user, sf["id"]):
             continue
+        if not first:
+            print("-")
+        first = False
         tc     = sf.get("topic_count") or 0
         cc     = sf.get("total_comments") or 0
         fields = f"sf={sf['id']}"
         if token:
             fields += f"|session={token}"
         restricted = "`Fca4[restricted]`f " if forum.subforum_is_restricted(sf["id"]) else ""
-        print(f"`F0af`[{sf['name']}`{forum.page_path}/subforum.mu`{fields}]`f  {restricted}")
+        print(f"`Fa60`[◆ {sf['name']}`{forum.page_path}/subforum.mu`{fields}]`f  {restricted}")
         if sf["description"]:
             print(f"`F888{sf['description']}`f")
-        print(f"`F777{tc} topics · {cc} replies`f")
-        print()
+        print(f"`F666{tc} topics · {cc} replies`f")
 
 forum.print_footer()

@@ -48,21 +48,22 @@ if user and forum.user_can_write_subforum(user, sf_id):
     sf_fields = f"sf={sf_id}"
     if token:
         sf_fields += f"|session={token}"
-    print(f"`[New Topic`{forum.page_path}/new_topic.mu`{sf_fields}]")
+    print(f"`Fa60`[✚ New Topic`{forum.page_path}/new_topic.mu`{sf_fields}]`f")
     print()
 
 topics = forum.get_topics(sf_id)
 if not topics:
     print("No topics in this subforum yet.")
 else:
-    for t in topics:
+    for i, t in enumerate(topics):
+        if i > 0:
+            print("-")
         t_f = f"topic={t['id']}"
         if token:
             t_f += f"|session={token}"
         a_link = forum.profile_link(t["author_name"], token)
-        status = "`F800[CLOSED]`f " if t["is_closed"] else ""
-        print(f"`F0af`[{t['title']}`{forum.page_path}/topic.mu`{t_f}]`f")
-        print(f"{status}by {a_link}  ·  {t['comment_count']} replies  ·  {forum.fmt_time(t['last_reply_at'])}")
-        print()
+        closed = "`F844[✖ closed]`f " if t["is_closed"] else ""
+        print(f"`Fa60`[▸ {t['title']}`{forum.page_path}/topic.mu`{t_f}]`f  {closed}")
+        print(f"`F666{t['comment_count']} replies  ·  {forum.fmt_time(t['last_reply_at'])}  ·  by `f{a_link}")
 
 forum.print_footer()

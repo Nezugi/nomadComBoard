@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 nomadComBoard - main.py
-Central library: Database, sessions, helper functions
+Central library: Database, sessions, helper functions, identity auth
 """
 
 import sqlite3
@@ -12,11 +12,11 @@ import time
 
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 
-storage_path  = "/home/user/.nomadComBoard"         # Path for DB & data
-page_path     = ":/page/comboard"                   # Path on node (: = local node)
-forum_name    = "nomadComBoard"                     # Display name
-site_description = "Discussions, topics & comments"  # Short description
-node_homepage = ":/page/index.mu"                # Link to node homepage
+storage_path     = "/home/user/.nomadComBoard"          # Path for DB & data
+page_path        = ":/page/comboard"                    # Path on node (: = local node)
+forum_name       = "nomadComBoard"                      # Display name
+site_description = "Discussions, topics & comments"     # Short description
+node_homepage    = ":/page/index.mu"                    # Link to node homepage
 
 # ─── DATABASE ────────────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             username        TEXT    NOT NULL UNIQUE,
-            password_hash   TEXT    NOT NULL,
+            password_hash   TEXT    NOT NULL DEFAULT '',
             lxmf_address    TEXT    DEFAULT '',
             display_name    TEXT    DEFAULT '',
             city            TEXT    DEFAULT '',
@@ -50,7 +50,8 @@ def init_db():
             is_admin        INTEGER DEFAULT 0,
             is_mod          INTEGER DEFAULT 0,
             registered_at   INTEGER DEFAULT (strftime('%s','now')),
-            post_count      INTEGER DEFAULT 0
+            post_count      INTEGER DEFAULT 0,
+            identity_hash   TEXT    DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS subforums (
@@ -127,8 +128,8 @@ def init_db():
             PRIMARY KEY (subforum_id, group_id)
         );
     """)
-    
-    # Create indices for better performance
+
+    # Performance indices
     c.executescript("""
         CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
         CREATE INDEX IF NOT EXISTS idx_topics_subforum_id ON topics(subforum_id);
@@ -140,6 +141,12 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_subforum_access_sf ON subforum_access(subforum_id);
     """)
 
+    # Migration: add identity_hash column if upgrading from older DB
+    existing_cols = [r[1] for r in c.execute("PRAGMA table_info(users)").fetchall()]
+    if "identity_hash" not in existing_cols:
+        c.execute("ALTER TABLE users ADD COLUMN identity_hash TEXT DEFAULT ''")
+
+    # Migration: password_hash may need DEFAULT '' on old DBs — handled by ALTER above.
     # Migration: add groups/access tables if upgrading from older DB
     existing_tables = [r[0] for r in c.execute(
         "SELECT name FROM sqlite_master WHERE type='table'"
@@ -168,6 +175,120 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+
+# ─── IDENTITY AUTH ────────────────────────────────────────────────────────────
+
+def get_remote_identity():
+    """Return the connecting client's identity hash, or '' if not identified."""
+    return os.environ.get("remote_identity", "").strip().lower()
+
+
+def is_valid_identity(identity_hash):
+    """Check that the identity hash is a valid 32-char hex string."""
+    if not identity_hash or len(identity_hash) != 32:
+        return False
+    return all(c in "0123456789abcdef" for c in identity_hash.lower())
+
+
+def get_user_by_identity(identity_hash):
+    """Return user dict for the given identity hash, or None."""
+    if not is_valid_identity(identity_hash):
+        return None
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM users WHERE identity_hash=?", (identity_hash.lower(),)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def register_user_identity(username, identity_hash):
+    """Register a new user with username + identity hash only (no password).
+    Returns None on success, else an error message string."""
+    username      = username.strip()[:32] if username else ""
+    identity_hash = identity_hash.strip().lower() if identity_hash else ""
+
+    if not username:
+        return "Username cannot be empty."
+    if not is_valid_identity(identity_hash):
+        return "No valid identity detected. Enable 'Identify to Nodes' in NomadNet settings."
+
+    conn = get_db()
+    if conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone():
+        conn.close()
+        return "Username already taken."
+    if conn.execute("SELECT id FROM users WHERE identity_hash=?", (identity_hash,)).fetchone():
+        conn.close()
+        return "This identity is already linked to an account."
+
+    # Empty password_hash marks an identity-only account
+    conn.execute(
+        "INSERT INTO users (username, password_hash, identity_hash) VALUES (?,?,?)",
+        (username, "", identity_hash)
+    )
+    conn.commit()
+    conn.close()
+    return None
+
+
+def link_identity(user_id, identity_hash):
+    """Link an identity hash to an existing account.
+    Returns None on success, else an error message string."""
+    identity_hash = identity_hash.strip().lower() if identity_hash else ""
+    if not is_valid_identity(identity_hash):
+        return "No valid identity detected. Enable 'Identify to Nodes' in NomadNet settings."
+    conn = get_db()
+    other = conn.execute(
+        "SELECT id FROM users WHERE identity_hash=? AND id!=?",
+        (identity_hash, user_id)
+    ).fetchone()
+    if other:
+        conn.close()
+        return "This identity is already linked to a different account."
+    conn.execute(
+        "UPDATE users SET identity_hash=? WHERE id=?", (identity_hash, user_id)
+    )
+    conn.commit()
+    conn.close()
+    return None
+
+
+def unlink_identity(user_id):
+    """Remove identity link from a user (only allowed if they have a password set)."""
+    conn = get_db()
+    user = conn.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user or not user["password_hash"]:
+        conn.close()
+        return "Cannot unlink: account has no password. Set a password first."
+    conn.execute("UPDATE users SET identity_hash='' WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+    return None
+
+
+def set_password(user_id, new_password):
+    """Set or update password for a user. Returns None on success, else error string."""
+    new_password = new_password.strip() if new_password else ""
+    if len(new_password) < 6:
+        return "Password too short (min 6 characters)."
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        (hash_password(new_password), user_id)
+    )
+    conn.commit()
+    conn.close()
+    return None
+
+
+def login_by_identity(identity_hash):
+    """Try to log in via identity hash. Returns (user, token) or (None, None)."""
+    user = get_user_by_identity(identity_hash)
+    if not user:
+        return None, None
+    token = create_session(user["id"])
+    return user, token
 
 
 # ─── GROUPS ───────────────────────────────────────────────────────────────────
@@ -238,7 +359,6 @@ def get_group_members(group_id):
 
 
 def get_user_group_ids(user_id):
-    """Return set of group IDs the user belongs to."""
     try:
         user_id = int(user_id)
     except (ValueError, TypeError):
@@ -253,7 +373,7 @@ def get_user_group_ids(user_id):
 
 def add_user_to_group(user_id, group_id):
     try:
-        user_id = int(user_id)
+        user_id  = int(user_id)
         group_id = int(group_id)
     except (ValueError, TypeError):
         return
@@ -268,7 +388,7 @@ def add_user_to_group(user_id, group_id):
 
 def remove_user_from_group(user_id, group_id):
     try:
-        user_id = int(user_id)
+        user_id  = int(user_id)
         group_id = int(group_id)
     except (ValueError, TypeError):
         return
@@ -284,7 +404,6 @@ def remove_user_from_group(user_id, group_id):
 # ─── SUBFORUM ACCESS ──────────────────────────────────────────────────────────
 
 def get_subforum_access(subforum_id):
-    """Return list of {group_id, group_name, can_read, can_write} for a subforum."""
     try:
         subforum_id = int(subforum_id)
     except (ValueError, TypeError):
@@ -304,9 +423,9 @@ def get_subforum_access(subforum_id):
 def set_subforum_access(subforum_id, group_id, can_read, can_write):
     try:
         subforum_id = int(subforum_id)
-        group_id = int(group_id)
-        can_read = 1 if can_read else 0
-        can_write = 1 if can_write else 0
+        group_id    = int(group_id)
+        can_read    = 1 if can_read else 0
+        can_write   = 1 if can_write else 0
     except (ValueError, TypeError):
         return
     conn = get_db()
@@ -322,7 +441,7 @@ def set_subforum_access(subforum_id, group_id, can_read, can_write):
 def remove_subforum_access(subforum_id, group_id):
     try:
         subforum_id = int(subforum_id)
-        group_id = int(group_id)
+        group_id    = int(group_id)
     except (ValueError, TypeError):
         return
     conn = get_db()
@@ -335,7 +454,6 @@ def remove_subforum_access(subforum_id, group_id):
 
 
 def subforum_is_restricted(subforum_id):
-    """True if at least one access rule exists for this subforum."""
     try:
         subforum_id = int(subforum_id)
     except (ValueError, TypeError):
@@ -349,8 +467,6 @@ def subforum_is_restricted(subforum_id):
 
 
 def user_can_read_subforum(user, subforum_id):
-    """Return True if user may read this subforum.
-    Admins and mods always pass. If no rules exist the subforum is open to all."""
     if not subforum_is_restricted(subforum_id):
         return True
     if user is None:
@@ -371,7 +487,6 @@ def user_can_read_subforum(user, subforum_id):
 
 
 def user_can_write_subforum(user, subforum_id):
-    """Return True if user may post in this subforum."""
     if not subforum_is_restricted(subforum_id):
         return True
     if user is None:
@@ -390,6 +505,9 @@ def user_can_write_subforum(user, subforum_id):
     conn.close()
     return row is not None
 
+
+# ─── PASSWORD ─────────────────────────────────────────────────────────────────
+
 def hash_password(password):
     salt = secrets.token_hex(16)
     h = hashlib.sha256((salt + password).encode()).hexdigest()
@@ -397,6 +515,8 @@ def hash_password(password):
 
 
 def verify_password(password, stored):
+    if not stored:
+        return False
     try:
         salt, h = stored.split(":", 1)
         return hashlib.sha256((salt + password).encode()).hexdigest() == h
@@ -418,9 +538,9 @@ SESSION_TTL = 60 * 60 * 24 * 7   # 7 days
 
 
 def create_session(user_id):
-    token = secrets.token_hex(32)
+    token   = secrets.token_hex(32)
     expires = int(time.time()) + SESSION_TTL
-    conn = get_db()
+    conn    = get_db()
     conn.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
     conn.execute("INSERT INTO sessions (token,user_id,expires_at) VALUES (?,?,?)",
                  (token, user_id, expires))
@@ -433,7 +553,7 @@ def get_session_user(token):
     if not token:
         return None
     conn = get_db()
-    row = conn.execute(
+    row  = conn.execute(
         "SELECT u.* FROM sessions s JOIN users u ON s.user_id=u.id "
         "WHERE s.token=? AND s.expires_at>?",
         (token, int(time.time()))
@@ -459,19 +579,16 @@ def purge_expired_sessions():
 # ─── USER ─────────────────────────────────────────────────────────────────────
 
 def register_user(username, password):
-    """Return None on success, else error message."""
+    """Register with username + password. Returns None on success, else error string."""
     username = username.strip()[:32] if username else ""
     password = password.strip()[:64] if password else ""
-    
+
     if not username or not password:
         return "Username and password cannot be empty."
-    if len(username) > 32:
-        return "Username too long (max 32 characters)."
     if len(password) < 6:
         return "Password too short (min 6 characters)."
     conn = get_db()
-    existing = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
-    if existing:
+    if conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone():
         conn.close()
         return "Username already taken."
     conn.execute("INSERT INTO users (username, password_hash) VALUES (?,?)",
@@ -483,27 +600,26 @@ def register_user(username, password):
 
 def get_user_by_name(username):
     conn = get_db()
-    row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    row  = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
     conn.close()
     return dict(row) if row else None
 
 
 def get_user_by_id(user_id):
     conn = get_db()
-    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    row  = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
     conn.close()
     return dict(row) if row else None
 
 
 def update_profile(user_id, lxmf_address, display_name, city, website, email, about):
-    """Update user profile with length limits."""
     lxmf_address = lxmf_address.strip()[:32] if lxmf_address else ""
     display_name = display_name.strip()[:60] if display_name else ""
-    city = city.strip()[:24] if city else ""
-    website = website.strip()[:40] if website else ""
-    email = email.strip()[:60] if email else ""
-    about = about.strip()[:500] if about else ""
-    
+    city         = city.strip()[:24]         if city         else ""
+    website      = website.strip()[:40]      if website      else ""
+    email        = email.strip()[:60]        if email        else ""
+    about        = about.strip()[:500]       if about        else ""
+
     conn = get_db()
     conn.execute(
         "UPDATE users SET lxmf_address=?, display_name=?, city=?, "
@@ -516,7 +632,6 @@ def update_profile(user_id, lxmf_address, display_name, city, website, email, ab
 
 def delete_user(user_id):
     conn = get_db()
-    # Comments and topics remain, author stays visible as deleted account
     conn.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM users WHERE id=?", (user_id,))
     conn.commit()
@@ -540,10 +655,9 @@ def get_all_users():
 # ─── SUBFORUMS ────────────────────────────────────────────────────────────────
 
 def get_subforums():
-    """Get all subforums with topic and comment counts."""
     conn = get_db()
     rows = conn.execute("""
-        SELECT s.*, 
+        SELECT s.*,
                COUNT(DISTINCT t.id) as topic_count,
                COUNT(DISTINCT c.id) as total_comments
         FROM subforums s
@@ -562,13 +676,13 @@ def get_subforum(subforum_id):
     except (ValueError, TypeError):
         return None
     conn = get_db()
-    row = conn.execute("SELECT * FROM subforums WHERE id=?", (subforum_id,)).fetchone()
+    row  = conn.execute("SELECT * FROM subforums WHERE id=?", (subforum_id,)).fetchone()
     conn.close()
     return dict(row) if row else None
 
 
 def create_subforum(name, description=""):
-    name = name.strip()[:100] if name else ""
+    name        = name.strip()[:100]        if name        else ""
     description = description.strip()[:500] if description else ""
     if not name:
         return None
@@ -610,7 +724,7 @@ def get_topic(topic_id):
     except (ValueError, TypeError):
         return None
     conn = get_db()
-    row = conn.execute("""
+    row  = conn.execute("""
         SELECT t.*, u.username as author_name
         FROM topics t JOIN users u ON t.author_id=u.id
         WHERE t.id=?
@@ -621,16 +735,16 @@ def get_topic(topic_id):
 
 def create_topic(subforum_id, author_id, title, body, tag_names):
     title = title.strip()[:100] if title else ""
-    body = body.strip()[:5000] if body else ""
+    body  = body.strip()[:5000] if body  else ""
     if not title or not body:
         return None
     try:
         subforum_id = int(subforum_id)
-        author_id = int(author_id)
+        author_id   = int(author_id)
     except (ValueError, TypeError):
         return None
     conn = get_db()
-    cur = conn.execute(
+    cur  = conn.execute(
         "INSERT INTO topics (subforum_id, author_id, title, body) VALUES (?,?,?,?)",
         (subforum_id, author_id, title, body)
     )
@@ -647,13 +761,13 @@ def delete_topic(topic_id):
         topic_id = int(topic_id)
     except (ValueError, TypeError):
         return
-    conn = get_db()
+    conn  = get_db()
     topic = conn.execute("SELECT author_id FROM topics WHERE id=?", (topic_id,)).fetchone()
     if topic:
         conn.execute("UPDATE users SET post_count=post_count-1 WHERE id=?", (topic["author_id"],))
     conn.execute("DELETE FROM topic_tags WHERE topic_id=?", (topic_id,))
-    conn.execute("DELETE FROM comments WHERE topic_id=?", (topic_id,))
-    conn.execute("DELETE FROM topics WHERE id=?", (topic_id,))
+    conn.execute("DELETE FROM comments WHERE topic_id=?",   (topic_id,))
+    conn.execute("DELETE FROM topics WHERE id=?",           (topic_id,))
     conn.commit()
     conn.close()
 
@@ -692,11 +806,11 @@ def add_comment(topic_id, author_id, body):
     if not body:
         return False
     try:
-        topic_id = int(topic_id)
+        topic_id  = int(topic_id)
         author_id = int(author_id)
     except (ValueError, TypeError):
         return False
-    now = int(time.time())
+    now  = int(time.time())
     conn = get_db()
     conn.execute(
         "INSERT INTO comments (topic_id, author_id, body, created_at) VALUES (?,?,?,?)",
@@ -718,7 +832,7 @@ def delete_comment(comment_id):
     except (ValueError, TypeError):
         return
     conn = get_db()
-    c = conn.execute("SELECT author_id, topic_id FROM comments WHERE id=?", (comment_id,)).fetchone()
+    c    = conn.execute("SELECT author_id, topic_id FROM comments WHERE id=?", (comment_id,)).fetchone()
     if c:
         conn.execute("UPDATE users SET post_count=post_count-1 WHERE id=?", (c["author_id"],))
         conn.execute("UPDATE topics SET comment_count=comment_count-1 WHERE id=?", (c["topic_id"],))
@@ -730,7 +844,6 @@ def delete_comment(comment_id):
 # ─── TAGS ─────────────────────────────────────────────────────────────────────
 
 def _set_tags(conn, topic_id, tag_names):
-    """Internal: Set tags for topic (comma-separated list)."""
     conn.execute("DELETE FROM topic_tags WHERE topic_id=?", (topic_id,))
     if not tag_names:
         return
@@ -775,8 +888,8 @@ def get_all_tags():
 
 def get_topics_by_tag(tag_name):
     tag_name = tag_name.strip()
-    conn = get_db()
-    rows = conn.execute("""
+    conn     = get_db()
+    rows     = conn.execute("""
         SELECT tp.*, u.username as author_name
         FROM topics tp
         JOIN users u ON tp.author_id=u.id
@@ -793,7 +906,7 @@ def get_topics_by_tag(tag_name):
 
 def get_setting(key):
     conn = get_db()
-    row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    row  = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
     conn.close()
     return row["value"] if row else ""
 
@@ -808,19 +921,10 @@ def set_setting(key, value):
 # ─── HELPER FUNCTIONS ──────────────────────────────────────────────────────────
 
 def fmt_time(ts):
-    """Unix timestamp → dd-mm-yyyy HH:MM format."""
+    """Unix timestamp → dd-mm-yyyy HH:MM."""
     if not ts:
         return "—"
     return time.strftime("%d-%m-%Y %H:%M", time.localtime(int(ts)))
-
-
-def print_header(title=""):
-    """Print header with optional title."""
-    if title:
-        print(f">>{title}")
-    else:
-        print(f">{forum_name}")
-    print()
 
 
 def profile_link(username, token=None):
@@ -828,11 +932,11 @@ def profile_link(username, token=None):
     fields = f"user={username}"
     if token:
         fields += f"|session={token}"
-    return f"`[{username}`{page_path}/profile.mu`{fields}]"
+    return f"`Fa60`[{username}`{page_path}/profile.mu`{fields}]`f"
 
 
 def nav_bar(current_user=None, back_url=None, token=None):
-    """Return standard navigation bar as Micron string."""
+    """Standard navigation bar as Micron string."""
     lines = []
     lines.append(f"`c`!`F0af{forum_name}`!`f")
     lines.append(f"`c`F777{site_description}`f")
@@ -849,7 +953,7 @@ def nav_bar(current_user=None, back_url=None, token=None):
         return f"`[{label}`{dest}{fields}]"
 
     links = [lnk("Home", f"{page_path}/index.mu")]
-    links.append(lnk("Help", f"{page_path}/help.mu"))
+    links.append(lnk("Help",  f"{page_path}/help.mu"))
     links.append(lnk("Tags",  f"{page_path}/tags.mu"))
     links.append(lnk("Users", f"{page_path}/users.mu"))
     links.append(lnk("Rules", f"{page_path}/rules.mu"))
@@ -871,18 +975,34 @@ def nav_bar(current_user=None, back_url=None, token=None):
     return "\n".join(lines)
 
 
+def print_header(title=None):
+    if title:
+        print(f"`c`!{title}`!")
+
+
 def print_footer():
-    """Footer with suite info."""
     print("-")
     print("`c`F444Off-Grid Community Suite · NomadNet`f")
     print("`a")
 
 
 def lxmf_link(address):
-    """Clickable LXMF address in NomadNet single-segment format."""
+    """Clickable LXMF link in NomadNet single-segment format."""
     if address and len(address) == 32 and all(c in "0123456789abcdefABCDEF" for c in address):
-        return f"`F4be`[lxmf@{address}]`f"
+        return f"`F59f`[lxmf@{address}]`f"
     return ""
+
+
+def btn(label, url, fields="", style="primary"):
+    """Styled action button with background color for form submissions."""
+    if style == "primary":
+        bg, fg = "244", "eef"
+    elif style == "danger":
+        bg, fg = "411", "fca"
+    else:
+        bg, fg = "333", "aaa"
+    f_part = f"`{fields}" if fields else ""
+    return f"`B{bg}`F{fg}`[  {label}  `{url}{f_part}]`b`f"
 
 
 # ─── INIT ─────────────────────────────────────────────────────────────────────

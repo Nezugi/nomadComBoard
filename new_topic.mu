@@ -46,8 +46,8 @@ print()
 if action == "submit" and title and body:
     try:
         topic_id = forum.create_topic(sf_id, user["id"], title, body, tags)
-        print("`F080Topic created.`f")
-        print(f"\n`[View Topic`{forum.page_path}/topic.mu`topic={topic_id}|session={token}]")
+        print("`F1a6Topic created.`f")
+        print(f"\n`Fa60`[→ View Topic`{forum.page_path}/topic.mu`topic={topic_id}|session={token}]`f")
         sys.exit(0)
     except Exception as e:
         print(f"`Ff55Error: {e}`f")
@@ -63,7 +63,8 @@ print("Tags (comma-separated, optional)")
 print("`B333`<60|tags`>`b")
 print()
 
-print(f"`[Create`{forum.page_path}/new_topic.mu`action=submit|sf={sf_id}|session={token}|*]")
-print(f"`[Cancel`{back}]")
+print(forum.btn("✚ Create Topic", f"{forum.page_path}/new_topic.mu", f"action=submit|sf={sf_id}|session={token}|*"))
+print()
+print(f"`Fa60`[← Cancel`{back}]`f")
 
 forum.print_footer()
