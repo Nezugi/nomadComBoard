@@ -17,7 +17,7 @@ Part of the [**Off‑Grid Community Suite**](https://github.com/Nezugi/Off-Grid-
 - **Subforums** — admin‑managed topic categories
 - **Topics & comments** — threaded discussions with chronological replies
 - **Tags** — assign on creation; tag cloud and filtered views
-- **Registration** — with identification to the Node or Username an Passwort , you can use both 
+- **Registration** — with identification to the Node or Username and Passwort , you can use both 
 - **User accounts** — registration, login, profiles (LXMF address, bio, city, website)
 - **Roles** — Guest · User · Moderator · Admin with granular permissions
 - **Groups** — Admin can create Groups an restrict Subforums in read / write to ceratain groups
