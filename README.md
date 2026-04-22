@@ -5,15 +5,19 @@ A full‑featured community discussion forum for [NomadNet](https://github.com/m
 Part of the [**Off‑Grid Community Suite**](https://github.com/Nezugi/Off-Grid-Community-Suite).
 
 **Tech stack:** Python · Micron Markup · SQLite  
-**No external dependencies. No internet required.**
+**No external dependencies. **
 
 ---
+
+<img width="1146" height="376" alt="ui Comboard" src="https://github.com/user-attachments/assets/267ea67d-a926-4e97-864e-ca5b9bde8f8c" />
+
 
 ## Features
 
 - **Subforums** — admin‑managed topic categories
 - **Topics & comments** — threaded discussions with chronological replies
 - **Tags** — assign on creation; tag cloud and filtered views
+- **Registration** — with identification to the Node or Username an Passwort , you can use both 
 - **User accounts** — registration, login, profiles (LXMF address, bio, city, website)
 - **Roles** — Guest · User · Moderator · Admin with granular permissions
 - **Groups** — Admin can create Groups an restrict Subforums in read / write to ceratain groups
@@ -21,7 +25,7 @@ Part of the [**Off‑Grid Community Suite**](https://github.com/Nezugi/Off-Grid-
 - **Admin panel** — manage subforums, rules, moderators, passwords and users
 - **Clickable LXMF addresses** — contact users directly from profiles
 - **Built‑in help page**
-- **Standard library only** — no pip, no background services
+- **Standard library only** — and no background services
 
 ---
 
